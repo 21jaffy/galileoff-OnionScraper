@@ -178,17 +178,18 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 		links := utils.ExtractLinks(string(body))
 		linkCount := len(links)
 
+		// Her durum için links.txt dosyasına yaz
+		if err := report.SaveLinks(url, links, outputDir); err != nil {
+			report.Log("ERROR", fmt.Sprintf("%s için linkler kaydedilemedi: %v", url, err))
+		}
+
 		if linkCount > 0 {
-			if err := report.SaveLinks(url, links, outputDir); err != nil {
-				report.Log("ERROR", fmt.Sprintf("%s için linkler kaydedilemedi: %v", url, err))
-			} else {
-				report.Log("INFO", fmt.Sprintf("%s adresinde %d adet link bulundu ve links.txt dosyasına eklendi.", url, linkCount))
-				// Bulunan linkleri log dosyasına da ekle
-				for _, l := range links {
-					// Güvenlik: Log dosyasında da defang yapalım
-					safeLink := strings.Replace(l, ".onion", "[.]onion", -1)
-					report.Log("LINK", fmt.Sprintf("  -> %s", safeLink))
-				}
+			report.Log("INFO", fmt.Sprintf("%s adresinde %d adet link bulundu ve links.txt dosyasına eklendi.", url, linkCount))
+			// Bulunan linkleri log dosyasına da ekle
+			for _, l := range links {
+				// Güvenlik: Log dosyasında da defang yapalım
+				safeLink := strings.Replace(l, ".onion", "[.]onion", -1)
+				report.Log("LINK", fmt.Sprintf("  -> %s", safeLink))
 			}
 		} else {
 			report.Log("INFO", fmt.Sprintf("%s adresinde hiç link bulunamadı.", url))

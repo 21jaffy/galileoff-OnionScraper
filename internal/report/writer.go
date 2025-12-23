@@ -140,10 +140,6 @@ func SaveScreenshot(url string, data []byte, outputDir string) error {
 
 // SaveLinks linkleri dosyaya kaydeder
 func SaveLinks(url string, links []string, outputDir string) error {
-	if len(links) == 0 {
-		return nil
-	}
-
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return err
 	}
@@ -159,6 +155,11 @@ func SaveLinks(url string, links []string, outputDir string) error {
 	border := strings.Repeat("=", 80)
 	header := fmt.Sprintf("\n%s\n  KAYNAK ADRES: %s\n%s\n", border, url, border)
 	f.WriteString(header)
+
+	if len(links) == 0 {
+		f.WriteString("  [!] Bu kaynak urle ilişkin gömülü url bulunamadı\n\n")
+		return nil
+	}
 
 	// Linkleri güvenli şekilde yaz (defang)
 	for _, link := range links {
