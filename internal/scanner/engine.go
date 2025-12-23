@@ -11,12 +11,14 @@ import (
 	"galileoff-OnionScraper/internal/network"
 	"galileoff-OnionScraper/internal/report"
 	"galileoff-OnionScraper/internal/ui"
+	"galileoff-OnionScraper/internal/utils"
 )
 
 // ScanResult tarama işleminin sonucunu tutar
 type ScanResult struct {
 	URL    string
 	Status string
+	UsedUA string
 	Error  error
 }
 
@@ -88,10 +90,10 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int) {
 		} else {
 			successCount++
 			// Başarılı durum
-			report.Log(fmt.Sprintf("[SUCCESS] %s -> OK", result.URL))
+			report.Log(fmt.Sprintf("[SUCCESS] %s -> OK [%s]", result.URL, result.UsedUA))
 
 			// Başarılı mesajını göster
-			ui.PrintStatusLine(result.URL, "BAŞARILI", "(Veri Çekildi)", true)
+			ui.PrintStatusLine(result.URL, "BAŞARILI", fmt.Sprintf("(%s)", result.UsedUA), true)
 		}
 	}
 
@@ -122,17 +124,23 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 
 		// Request oluştur (User-Agent eklemek için)
 		req, err := http.NewRequest("GET", targetURL, nil)
+
+		// Rastgele User-Agent ve ilgili header'ları ayarla
+		profile := utils.GetRandomProfile()
 		if err != nil {
-			results <- ScanResult{URL: url, Status: "FAILED", Error: err}
+			results <- ScanResult{URL: url, Status: "FAILED", UsedUA: profile.Name, Error: err}
 			continue
 		}
 
-		// Tor Browser User-Agent'ı ekle (Gizlilik için standart Tor UA kullandım)
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; rv:109.0) Gecko/20100101 Firefox/115.0")
+		// Header'ları ayarla
+		req.Header.Set("User-Agent", profile.UserAgent)
+		for k, v := range profile.Headers {
+			req.Header.Set(k, v)
+		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			results <- ScanResult{URL: url, Status: "FAILED", Error: err}
+			results <- ScanResult{URL: url, Status: "FAILED", UsedUA: profile.Name, Error: err}
 			continue
 		}
 
@@ -140,7 +148,7 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 		resp.Body.Close()
 
 		if err != nil {
-			results <- ScanResult{URL: url, Status: "FAILED", Error: err}
+			results <- ScanResult{URL: url, Status: "FAILED", UsedUA: profile.Name, Error: err}
 			continue
 		}
 
@@ -162,6 +170,6 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 			}
 		}
 
-		results <- ScanResult{URL: url, Status: "SUCCESS", Error: nil}
+		results <- ScanResult{URL: url, Status: "SUCCESS", UsedUA: profile.Name, Error: nil}
 	}
 }

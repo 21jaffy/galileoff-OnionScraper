@@ -14,6 +14,7 @@ import (
 	"galileoff-OnionScraper/internal/report"
 	"galileoff-OnionScraper/internal/scanner"
 	"galileoff-OnionScraper/internal/ui"
+	"galileoff-OnionScraper/internal/utils"
 )
 
 func main() {
@@ -54,6 +55,23 @@ func main() {
 				break
 			}
 			continue
+		}
+
+		// User-Agent Dosyası Seçimi
+		uaFile := selectUserAgentFile()
+		if uaFile != "" {
+			if err := utils.LoadProfiles(uaFile); err != nil {
+				ui.PrintWarningBox([]string{
+					"USER-AGENT LİSTESİ YÜKLENEMEDİ",
+					"Seçilen dosya içeriği hatalı veya boş.",
+					"Otomatik olarak varsayılan liste devreye alındı.",
+					fmt.Sprintf("(Hata: %v)", err),
+				})
+			} else {
+				ui.PrintSuccess(fmt.Sprintf("User-Agent Profilleri Yüklendi: %s", uaFile))
+			}
+		} else {
+			ui.PrintInfo("Varsayılan User-Agent listesi kullanılıyor.")
 		}
 
 		// Klasör Hazırlığı
@@ -142,6 +160,46 @@ func selectTargetFile() string {
 	fmt.Printf(" %sManuel Dosya Yolu Girin >%s ", ui.ColorCyan, ui.ColorReset)
 	text, _ := reader.ReadString('\n')
 	return strings.TrimSpace(text)
+}
+
+func selectUserAgentFile() string {
+	files, err := filepath.Glob("*.json")
+	if err != nil || len(files) == 0 {
+		return ""
+	}
+
+	fmt.Println()
+	fmt.Printf(" %s%s USER-AGENT YAPILANDIRMASI:%s\n", ui.ColorCyan, ui.IconArrow, ui.ColorReset)
+	fmt.Println(strings.Repeat("-", 50))
+
+	// Dosyaları listele
+	for i, f := range files {
+		fmt.Printf("   %s[%d]%s %s\n", ui.ColorGreen, i+1, ui.ColorReset, f)
+	}
+
+	// Varsayılan seçenek
+	fmt.Printf("   %s[0]%s Varsayılan (Gömülü Liste)\n", ui.ColorYellow, ui.ColorReset)
+	fmt.Println(strings.Repeat("-", 50))
+	fmt.Println()
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf(" %sNörüyoz >%s ", ui.ColorCyan, ui.ColorReset)
+		text, _ := reader.ReadString('\n')
+		text = strings.TrimSpace(text)
+
+		if text == "0" || text == "" {
+			return ""
+		}
+
+		var choice int
+		_, err := fmt.Sscanf(text, "%d", &choice)
+
+		if err == nil && choice > 0 && choice <= len(files) {
+			return files[choice-1]
+		}
+		ui.PrintError("Geçersiz seçim! Listeden bi numara seçsene.")
+	}
 }
 
 func analyzeOutput(dir string) ([]ui.FileInfo, string) {
