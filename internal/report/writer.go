@@ -2,6 +2,8 @@ package report
 
 import (
 	"fmt"
+	"galileoff-OnionScraper/internal/classifier"
+	"galileoff-OnionScraper/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,7 +141,7 @@ func SaveScreenshot(url string, data []byte, outputDir string) error {
 }
 
 // SaveLinks linkleri dosyaya kaydeder
-func SaveLinks(url string, links []string, outputDir string) error {
+func SaveLinks(url, sourceTag string, links []utils.LinkData, outputDir string) error {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return err
 	}
@@ -153,7 +155,8 @@ func SaveLinks(url string, links []string, outputDir string) error {
 
 	// Başlık
 	border := strings.Repeat("=", 80)
-	header := fmt.Sprintf("\n%s\n  KAYNAK ADRES: %s\n  BULUNAN LİNK SAYISI: %d\n%s\n", border, url, len(links), border)
+	// Örn: KAYNAK ADRES: [MARKET] http://...
+	header := fmt.Sprintf("\n%s\n  KAYNAK ADRES: %s %s\n  BULUNAN LİNK SAYISI: %d\n%s\n", border, sourceTag, url, len(links), border)
 	f.WriteString(header)
 
 	if len(links) == 0 {
@@ -163,9 +166,14 @@ func SaveLinks(url string, links []string, outputDir string) error {
 
 	// Linkleri güvenli şekilde yaz (defang)
 	for _, link := range links {
+		// İçerik Analizi Yap
+		classification := classifier.AnalyzeLinkContext(link.URL, link.Text)
+
 		// .onion -> [.]onion
-		defanged := strings.Replace(link, ".onion", "[.]onion", -1)
-		f.WriteString(fmt.Sprintf("  [+] %s\n", defanged))
+		defanged := strings.Replace(link.URL, ".onion", "[.]onion", -1)
+
+		// Örn: [+] [LOGIN?] http://...
+		f.WriteString(fmt.Sprintf("  [+] %-15s %s\n", classification.Tag+"?", defanged))
 	}
 	f.WriteString("\n")
 

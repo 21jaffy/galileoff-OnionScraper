@@ -229,7 +229,7 @@ func PrintWarningBox(lines []string) {
 }
 
 // PrintStatusLine tarama sonucunu hizalı gösterir
-func PrintStatusLine(item, status, detail string, isSuccess bool) {
+func PrintStatusLine(tag, item, status, detail string, isSuccess bool) {
 	color := ColorRed
 	icon := IconCross
 	if isSuccess {
@@ -237,7 +237,14 @@ func PrintStatusLine(item, status, detail string, isSuccess bool) {
 		icon = IconCheck
 	}
 
-	fmt.Printf("   %s%-35s%s %s%s %s%s%s\n",
+	// Etiket Formatı
+	tagDisplay := ""
+	if tag != "" {
+		tagDisplay = fmt.Sprintf("%s%-18s%s ", ColorCyan, tag, ColorReset)
+	}
+
+	fmt.Printf("   %s%s%-35s%s %s%s %s%s%s\n",
+		tagDisplay,
 		ColorWhite, item, ColorReset,
 		color, icon, status,
 		ColorReset, detail)

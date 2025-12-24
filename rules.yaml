@@ -1,0 +1,101 @@
+# rules.yaml - galileoff. Sınıflandırma ve Tehdit Analiz Kuralları
+# Bu dosya etiketleme mantığının beynidir. Kategorileri, anahtar kelimeleri ve yapısal kuralları buradan yönetebilirsiniz.
+
+categories:
+  # ------------------------------------------------------------------
+  # 1. Yüksek Öncelikli Yapısal Kategoriler (Teknik Tespit)
+  # ------------------------------------------------------------------
+  - id: "login"
+    name: "Giriş Paneli"
+    tag: "[GİRİŞ PANELİ]"
+    color: "red"
+    priority: 100
+    structure_rules:
+      - selector: "input[type='password']"
+      - selector: "form[action*='login']"
+    keywords:
+      high: ["Üye Girişi", "Member Login", "Sign In", "Forgot Password", "Kullanıcı Adı", "Şifrenizi mi unuttunuz", "Hesap Oluştur"]
+    max_links: 50 # Login sayfaları genelde sadedir ama footer linkleri olabilir
+
+  - id: "forum"
+    name: "Forum / Topluluk"
+    tag: "[FORUM]"
+    color: "blue"
+    priority: 80
+    keywords:
+      high: ["Powered by vBulletin", "Powered by phpBB", "Powered by XenForo", "Powered by SMF", "Powered by MyBB", "Powered by Flarum"]
+      medium: ["Forum Statistics", "Last Post", "Active Threads", "Board Index", "Giriş Yap veya Kayıt Ol", "Hoşgeldin Ziyaretçi"]
+    structure_rules:
+      - selector: "div.forum-category"
+
+  # ------------------------------------------------------------------
+  # 2. İçerik Bazlı Kategoriler (Kelime Analizi)
+  # ------------------------------------------------------------------
+  - id: "market"
+    name: "Karaborsa / Market"
+    tag: "[MARKET]"
+    color: "green"
+    priority: 50
+    keywords:
+      high: ["Add to Cart", "Escrow Service", "Buy with Bitcoin", "Checkout Now", "Shopping Cart", "Sepete Ekle", "Güvenli Ödeme", "Sipariş Ver"]
+      medium: ["Shipping Options", "Vendor Rating", "Product Description", "XMR Accepted", "BTC Accepted", "Global Shipping", "Ürün Açıklaması"]
+      exclude: ["Forum Rules", "Security Blog", "Research Paper", "Tech News", "Political Analysis", "Günlük Haberler", "Login"] # Yanlış pozitifleri önle
+
+  - id: "ransomware"
+    name: "Fidye Yazılım Grubu"
+    tag: "[FİDYE YAZILIM]"
+    color: "red"
+    priority: 90
+    keywords:
+      high: ["files represent", "your files are encrypted", "lockbit supp", "download file list", "leaked data", "verileriniz şifrelendi", "fidye ödeme"]
+      medium: ["decryption id", "download tor browser", "payment deadline", "time remaining", "private key purchase"]
+
+  - id: "mixer"
+    name: "Kripto Karıştırıcı (Mixer)"
+    tag: "[KRİPTO MİKSER]"
+    color: "yellow"
+    keywords:
+      high: ["Mix My Coins", "Clean Your Coins", "Bitcoin Mixer", "Tumbling Service", "Anonymous Transaction", "No Logs Policy"]
+      medium: ["Service Fee", "Delay Time", "Mixer Code", "Letter of Guarantee"]
+
+  - id: "fraud"
+    name: "Dolandırıcılık / Sahtecilik"
+    tag: "[DOLANDIRICILIK]"
+    color: "magenta"
+    keywords:
+      high: ["Cloned Credit Cards", "Fake Passports", "Dump Shop", "CVV Fullz", "Paypal Account Logs", "Hacked Accounts", "Bank Drop Service"]
+      medium: ["Western Union Transfer", "Gift Cards 50% off", "Physical Card Shipping"]
+    exclude: ["Security Research", "Fraud Prevention", "News Article"]
+
+  - id: "whistleblower"
+    name: "Sızıntı / İhbar (SecureDrop)"
+    tag: "[İHBAR/SIZINTI]"
+    color: "cyan"
+    keywords:
+      high: ["SecureDrop", "Submit Documents", "Anonymous Tip", "Journalist Contact", "Whistleblowing Platform", "Güvenli İhbar", "Belge Yükle"]
+
+  - id: "hosting"
+    name: "Onion Hosting / Servis Sağlayıcı"
+    tag: "[HOSTING]"
+    color: "white"
+    keywords:
+      high: ["Free Onion Hosting", "Hidden Service Hosting", "Anonymous VPS", "Offshore Hosting", "Tor Hidden Service Provider", "Domain Registration"]
+      medium: ["cPanel Access", "Bitcoin Payment", "No KY"]
+
+  - id: "apt"
+    name: "APT / Devlet Destekli Grup"
+    tag: "[APT GRUBU]"
+    color: "yellow"
+    priority: 95
+    keywords:
+      high: ["Top Secret Document", "Ministry of Defense", "Internal Memo", "Classified Report", "Gizli Belge", "Bakanlık Yazışması"]
+
+  - id: "malware"
+    name: "Zararlı Yazılım / Botnet C2"
+    tag: "[ZARARLI YAZILIM]"
+    color: "red"
+    priority: 85
+    keywords:
+      high: ["Index of /payloads", "Botnet Panel", "C2 Command", "RAT Builder", "FUD Crypter", "Malware Download"]
+
+# Varsayılan (bulunamayan) siteler için program otomatik olarak [BİLİNMEYEN] etiketi verecektir.

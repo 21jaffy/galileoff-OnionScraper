@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"galileoff-OnionScraper/internal/classifier"
 	"galileoff-OnionScraper/internal/network"
 	"galileoff-OnionScraper/internal/report"
 	"galileoff-OnionScraper/internal/ui"
@@ -22,10 +23,23 @@ type ScanResult struct {
 	UsedUA     string
 	Error      error
 	LinkCount  int
+	Tag        string // Sınıflandırma Etiketi
 }
 
 // StartScan bir çalışan havuzu (worker pool) ile tarama işlemini başlatır ve (başarılı, başarısız, toplam_link) sayılarını döndürür
 func StartScan(targets []string, concurrency int, outputDir string) (int, int, int) {
+	// Sınıflandırma Kurallarını Yükle
+	if err := classifier.LoadRules("rules.yaml"); err != nil {
+		ui.PrintWarningBox([]string{
+			"SINIFLANDIRMA KURALLARI YÜKLENEMEDİ",
+			"rules.yaml dosyası okunamadı veya hatalı.",
+			"Sınıflandırma özelliği [BİLİNMEYEN] olarak çalışacak.",
+			fmt.Sprintf("(Hata: %v)", err),
+		})
+	} else {
+		ui.PrintSuccess("Sınıflandırma Kuralları Yüklendi (rules.yaml)")
+	}
+
 	client, proxyAddr, err := network.NewTorClient()
 
 	// Tor bağlantı durumu kontrolü
@@ -89,7 +103,7 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int, i
 			} else {
 				detailMsg = "(Erişim Hatası)"
 			}
-			ui.PrintStatusLine(result.URL, "BAŞARISIZ", detailMsg, false)
+			ui.PrintStatusLine("", result.URL, "BAŞARISIZ", detailMsg, false)
 		} else {
 			successCount++
 			totalLinks += result.LinkCount
@@ -106,10 +120,10 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int, i
 				logLevel = "WARNING"
 			}
 
-			report.Log(logLevel, fmt.Sprintf("%s -> %d %s [%s]", result.URL, result.StatusCode, statusText, result.UsedUA))
+			report.Log(logLevel, fmt.Sprintf("%s %s -> %d %s [%s]", result.Tag, result.URL, result.StatusCode, statusText, result.UsedUA))
 
 			// Başarılı mesajını göster
-			ui.PrintStatusLine(result.URL, "BAŞARILI", fmt.Sprintf("(%d %s)", result.StatusCode, statusText), true)
+			ui.PrintStatusLine(result.Tag, result.URL, "BAŞARILI", fmt.Sprintf("(%d %s)", result.StatusCode, statusText), true)
 		}
 	}
 
@@ -191,6 +205,19 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 			continue
 		}
 
+		// İÇERİK ANALİZİ VE SINIFLANDIRMA
+		// Önce linkleri çıkar (analiz için link sayısı lazım)
+		links := utils.ExtractLinks(string(body))
+		linkCount := len(links)
+
+		// Sınıflandırma motorunu çalıştır
+		analysisResult := classifier.Analyze(string(body), url, linkCount)
+
+		// Analiz sonucunu logla
+		report.Log("ANALİZ", fmt.Sprintf("%s URL: %s - Skor: %d", analysisResult.Tag, url, analysisResult.Score))
+		report.Log("DEBUG", fmt.Sprintf("Response [%s] - Status: %d, Size: %d, Type: %s, Server: %s, Etiket: %s",
+			url, statusCode, respSize, contentType, server, analysisResult.Tag))
+
 		// HTML içeriğini kaydet
 		if err := report.SaveHTML(url, string(body), outputDir); err != nil {
 			report.Log("ERROR", fmt.Sprintf("%s için HTML kaydetme hatası: %v", url, err))
@@ -198,21 +225,17 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 			report.Log("INFO", fmt.Sprintf("HTML Kaydedildi: %s", url))
 		}
 
-		// Linkleri ayıkla ve kaydet
-		links := utils.ExtractLinks(string(body))
-		linkCount := len(links)
-
-		// Her durum için links.txt dosyasına yaz
-		if err := report.SaveLinks(url, links, outputDir); err != nil {
+		// Linkleri ve tahminleri kaydet
+		if err := report.SaveLinks(url, analysisResult.Tag, links, outputDir); err != nil {
 			report.Log("ERROR", fmt.Sprintf("%s için linkler kaydedilemedi: %v", url, err))
 		}
 
 		if linkCount > 0 {
-			report.Log("INFO", fmt.Sprintf("%s adresinde %d adet link bulundu ve links.txt dosyasına eklendi.", url, linkCount))
+			report.Log("INFO", fmt.Sprintf("%s adresinde %d adet link bulundu. Kaynak Etiketi: %s", url, linkCount, analysisResult.Tag))
 			// Bulunan linkleri log dosyasına da ekle
 			for _, l := range links {
 				// Güvenlik: Log dosyasında da defang yapalım
-				safeLink := strings.Replace(l, ".onion", "[.]onion", -1)
+				safeLink := strings.Replace(l.URL, ".onion", "[.]onion", -1)
 				report.Log("LINK", fmt.Sprintf("  -> %s", safeLink))
 			}
 		} else {
@@ -230,7 +253,7 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 				report.Log("ERROR", fmt.Sprintf("%s için screenshot dosyası kaydedilemedi: %v", url, err))
 			} else {
 				ssDuration := time.Since(ssStartTime)
-				report.Log("SUCCESS", fmt.Sprintf("%s için screenshot başarıyla kaydedildi. (Screenshot Süresi: %s)", url, ssDuration))
+				report.Log("SUCCESS", fmt.Sprintf("%s için screenshot başarıyla kaydedildi. (Süre: %s)", url, ssDuration))
 			}
 		}
 
@@ -241,6 +264,7 @@ func worker(client *http.Client, proxyAddr string, tasks <-chan string, results 
 			UsedUA:     profile.Name,
 			Error:      nil,
 			LinkCount:  linkCount,
+			Tag:        analysisResult.Tag,
 		}
 	}
 }
