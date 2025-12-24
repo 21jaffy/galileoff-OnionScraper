@@ -67,6 +67,10 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int, i
 
 	ui.PrintSectionHeader(fmt.Sprintf("Tarama Başlatılıyor (%d Hedef)", len(targets)))
 
+	// Canlı İlerleme Çubuğu
+	progress := ui.NewLiveProgress("Hedefler Taranıyor...", len(targets))
+	progress.Start()
+
 	// İşçileri (workers/köle) başlat
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -83,6 +87,7 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int, i
 	go func() {
 		wg.Wait()
 		close(results)
+		progress.Stop() // Tüm işler bitince spinner'ı durdur
 	}()
 
 	successCount := 0
@@ -91,40 +96,45 @@ func StartScan(targets []string, concurrency int, outputDir string) (int, int, i
 
 	// Sonuçları işle
 	for result := range results {
-		if result.Error != nil {
-			failCount++
-			// Hatayı log dosyasına yaz
-			report.Log("FAILED", fmt.Sprintf("%s -> %v", result.URL, result.Error))
+		progress.Increment()
 
-			// Kullanıcı için basit bir mesaj
-			var detailMsg string
-			if strings.Contains(result.Error.Error(), "TOR_CONNECTION_MISSING") {
-				detailMsg = "(TOR Servisi Yok)"
+		// Spinner'ı bozmadan log yazmak için PrintLog kullanıyoruz
+		progress.PrintLog(func() {
+			if result.Error != nil {
+				failCount++
+				// Hatayı log dosyasına yaz
+				report.Log("FAILED", fmt.Sprintf("%s -> %v", result.URL, result.Error))
+
+				// Kullanıcı için basit bir mesaj
+				var detailMsg string
+				if strings.Contains(result.Error.Error(), "TOR_CONNECTION_MISSING") {
+					detailMsg = "(TOR Servisi Yok)"
+				} else {
+					detailMsg = "(Erişim Hatası)"
+				}
+				ui.PrintStatusLine("", result.URL, "BAŞARISIZ", detailMsg, false)
 			} else {
-				detailMsg = "(Erişim Hatası)"
+				successCount++
+				totalLinks += result.LinkCount
+
+				// Başarılı durum: HTTP Kodu ile logla
+				statusText := http.StatusText(result.StatusCode)
+				if statusText == "" {
+					statusText = "Unknown"
+				}
+
+				// Log seviyesini belirle (200-300 SUCCESS, diğerleri WARNING)
+				logLevel := "SUCCESS"
+				if result.StatusCode < 200 || result.StatusCode >= 300 {
+					logLevel = "WARNING"
+				}
+
+				report.Log(logLevel, fmt.Sprintf("%s %s -> %d %s [%s]", result.Tag, result.URL, result.StatusCode, statusText, result.UsedUA))
+
+				// Başarılı mesajını göster
+				ui.PrintStatusLine(result.Tag, result.URL, "BAŞARILI", fmt.Sprintf("(%d %s)", result.StatusCode, statusText), true)
 			}
-			ui.PrintStatusLine("", result.URL, "BAŞARISIZ", detailMsg, false)
-		} else {
-			successCount++
-			totalLinks += result.LinkCount
-
-			// Başarılı durum: HTTP Kodu ile logla
-			statusText := http.StatusText(result.StatusCode)
-			if statusText == "" {
-				statusText = "Unknown"
-			}
-
-			// Log seviyesini belirle (200-300 SUCCESS, diğerleri WARNING)
-			logLevel := "SUCCESS"
-			if result.StatusCode < 200 || result.StatusCode >= 300 {
-				logLevel = "WARNING"
-			}
-
-			report.Log(logLevel, fmt.Sprintf("%s %s -> %d %s [%s]", result.Tag, result.URL, result.StatusCode, statusText, result.UsedUA))
-
-			// Başarılı mesajını göster
-			ui.PrintStatusLine(result.Tag, result.URL, "BAŞARILI", fmt.Sprintf("(%d %s)", result.StatusCode, statusText), true)
-		}
+		})
 	}
 
 	ui.PrintSectionHeader("Tarama Tamamlandı")

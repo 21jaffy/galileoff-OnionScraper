@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -21,6 +22,9 @@ var (
 	ColorReset  = "\033[0m"
 	ColorBold   = "\033[1m"
 )
+
+// Daktilo efekti yazma hızını buradan ayarlıyom
+var TypingDelay = 2 * time.Millisecond
 
 const (
 	IconCheck   = "[+]"
@@ -47,48 +51,172 @@ type FileInfo struct {
 }
 
 // PrintTyped metni daktilo efektiyle yazdırır
-func PrintTyped(text string, delay time.Duration) {
+func PrintTyped(text string, delay time.Duration, color string) {
+	if color != "" {
+		fmt.Print(color)
+	}
 	for _, char := range text {
 		fmt.Printf("%c", char)
 		time.Sleep(delay)
 	}
-	fmt.Println()
+	if color != "" {
+		fmt.Print(ColorReset)
+	}
+}
+
+// ClearLine satırı temizler
+func ClearLine() {
+	fmt.Print("\033[2K\r")
+}
+
+// MoveCursorUp imleci yukarı taşır
+func MoveCursorUp(lines int) {
+	fmt.Printf("\033[%dA", lines)
+}
+
+// LiveProgress canlı ilerleme çubuğu/spinner yönetimi
+type LiveProgress struct {
+	stopChan chan bool
+	wg       *sync.WaitGroup
+	mu       sync.Mutex
+	message  string
+	total    int
+	current  int
+}
+
+// NewLiveProgress yeni bir canlı ilerleme göstergesi oluşturur
+func NewLiveProgress(message string, total int) *LiveProgress {
+	return &LiveProgress{
+		stopChan: make(chan bool),
+		wg:       &sync.WaitGroup{},
+		message:  message,
+		total:    total,
+		current:  0,
+	}
+}
+
+// Start animasyonu başlatır
+func (lp *LiveProgress) Start() {
+	lp.wg.Add(1)
+	go func() {
+		defer lp.wg.Done()
+		chars := []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}
+		i := 0
+		for {
+			select {
+			case <-lp.stopChan:
+				lp.mu.Lock()
+				ClearLine()
+				lp.mu.Unlock()
+				return
+			default:
+				lp.mu.Lock()
+				percentage := 0
+				if lp.total > 0 {
+					percentage = (lp.current * 100) / lp.total
+				}
+
+				// Spinner + Message + Progress
+				spin := string(chars[i%len(chars)])
+				status := fmt.Sprintf("%s %s %s [%d/%d] %% %d", ColorCyan+spin+ColorReset, lp.message, ColorYellow, lp.current, lp.total, percentage)
+
+				fmt.Printf("\r%s", status)
+				lp.mu.Unlock()
+
+				time.Sleep(100 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+}
+
+// Increment ilerlemeyi artırır
+func (lp *LiveProgress) Increment() {
+	lp.current++
+}
+
+// Stop animasyonu durdurur
+func (lp *LiveProgress) Stop() {
+	lp.stopChan <- true
+	lp.wg.Wait()
+	ClearLine()
+}
+
+// PrintLogWithSpinner canlı spinner çalışırken araya log girmek için kullanılır
+// Spinnerı siler, logu yazar, spinnerı tekrar başlatır gibi görünür
+func (lp *LiveProgress) PrintLog(logFunc func()) {
+	lp.mu.Lock()
+	defer lp.mu.Unlock()
+
+	ClearLine()
+	logFunc()
+}
+
+// TypePrint formatlı metni daktilo efektiyle yazar
+func TypePrint(format string, a ...interface{}) {
+	text := fmt.Sprintf(format, a...)
+	PrintTyped(text, TypingDelay, "")
+}
+
+// TypePrintln satır sonu ekleyerek daktilo efekti
+func TypePrintln(a ...interface{}) {
+	text := fmt.Sprint(a...) + "\n"
+	PrintTyped(text, TypingDelay, "")
 }
 
 // PrintBoxedTitle ASCII banner altındaki başlık kutusunu basar
 func PrintBoxedTitle(title, subtitle string) {
 	width := 60
 	fmt.Println()
-	// Üst çizgi: İçerik genişliği + 2 (sağ ve sol borderlar için)
-	fmt.Printf(" %s%s%s\n", ColorCyan, strings.Repeat("=", width+2), ColorReset)
 
-	// Başlığı ortala
-	titlePadding := (width - utf8.RuneCountInString(title)) / 2
-	fmt.Printf(" %s|%s%s%s%s|%s\n", ColorCyan, strings.Repeat(" ", titlePadding), ColorBold+title, ColorReset+ColorCyan, strings.Repeat(" ", width-titlePadding-utf8.RuneCountInString(title)), ColorReset)
+	// Çerçeve renkleri
+	frameColor := ColorBlue
+	titleColor := ColorBold + ColorWhite
+	subColor := ColorCyan
 
-	// Ara çizgi
-	fmt.Printf(" %s|%s|%s\n", ColorCyan, strings.Repeat("-", width), ColorReset)
+	// Üst Kenar
+	TypePrint(" %s╔%s╗%s\n", frameColor, strings.Repeat("═", width), ColorReset)
 
-	// Alt başlığı ortala
-	subPadding := (width - utf8.RuneCountInString(subtitle)) / 2
-	fmt.Printf(" %s|%s%s%s|%s\n", ColorCyan, strings.Repeat(" ", subPadding), subtitle, strings.Repeat(" ", width-subPadding-utf8.RuneCountInString(subtitle)), ColorReset)
+	// Başlık
+	titlePad := (width - utf8.RuneCountInString(title)) / 2
 
-	// Alt çizgi
-	fmt.Printf(" %s%s%s\n", ColorCyan, strings.Repeat("=", width+2), ColorReset)
+	TypePrint(" %s║%s%s%s%s%s║%s\n",
+		frameColor,
+		strings.Repeat(" ", titlePad),
+		titleColor, title,
+		frameColor,
+		strings.Repeat(" ", width-titlePad-utf8.RuneCountInString(title)),
+		ColorReset)
+
+	// Ara Çizgi
+	TypePrint(" %s╠%s╣%s\n", frameColor, strings.Repeat("═", width), ColorReset)
+
+	// Alt Başlık
+	subPad := (width - utf8.RuneCountInString(subtitle)) / 2
+	TypePrint(" %s║%s%s%s%s%s║%s\n",
+		frameColor,
+		strings.Repeat(" ", subPad),
+		subColor, subtitle,
+		frameColor,
+		strings.Repeat(" ", width-subPad-utf8.RuneCountInString(subtitle)),
+		ColorReset)
+
+	// Alt Kenar
+	TypePrint(" %s╚%s╝%s\n", frameColor, strings.Repeat("═", width), ColorReset)
 	fmt.Println()
 }
 
 // PrintMenu seçenekleri listeler ve kullanıcı seçimini döndürür
 func PrintMenu(items []string) int {
-	fmt.Printf("\n %s%s Taranacak dosyayı seçin:%s\n", ColorCyan, IconArrow, ColorReset)
-	fmt.Println(strings.Repeat("-", 40))
+	TypePrint("\n %s%s Taranacak hedef dosyayı seçin:%s\n", ColorCyan, IconArrow, ColorReset)
+	TypePrint(" %s%s%s\n", ColorBlue, strings.Repeat("┄", 40), ColorReset)
 
 	for i, item := range items {
-		fmt.Printf("   %s[%d]%s %s\n", ColorGreen, i+1, ColorReset, item)
+		TypePrint("   %s[%d]%s %s\n", ColorGreen, i+1, ColorReset, item)
 	}
-	fmt.Printf("   %s[%d]%s Manuel Dosya Yolu Gir\n", ColorGreen, len(items)+1, ColorReset)
-	fmt.Printf("   %s[0]%s Çıkış\n", ColorRed, ColorReset)
-	fmt.Println(strings.Repeat("-", 40))
+	TypePrint("   %s[%d]%s Manuel Dosya Yolu Gir\n", ColorYellow, len(items)+1, ColorReset)
+	TypePrint("   %s[0]%s Çıkış\n", ColorRed, ColorReset)
+	TypePrint(" %s%s%s\n", ColorBlue, strings.Repeat("┄", 40), ColorReset)
 	fmt.Println()
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -110,35 +238,38 @@ func PrintScanReport(stats ReportStats) {
 	fmt.Println()
 	width := 50
 
-	// Üst Çizgi
-	fmt.Printf(" %s%s%s\n", ColorBlue, strings.Repeat("=", width+2), ColorReset)
+	borderColor := ColorCyan
+	labelColor := ColorWhite
+
+	// Üst Kenar
+	TypePrint(" %s╔%s╗%s\n", borderColor, strings.Repeat("═", width), ColorReset)
 
 	// Başlık
 	title := "TARAMA RAPORU"
 	padLeft := (width - utf8.RuneCountInString(title)) / 2
 	padRight := width - padLeft - utf8.RuneCountInString(title)
-	fmt.Printf(" %s|%s%s%s%s%s%s%s|%s\n", ColorBlue, ColorReset, strings.Repeat(" ", padLeft), ColorBold+ColorWhite, title, ColorReset, strings.Repeat(" ", padRight), ColorBlue, ColorReset)
+	TypePrint(" %s║%s%s%s%s%s%s%s║%s\n", borderColor, ColorReset, strings.Repeat(" ", padLeft), ColorBold+ColorWhite, title, ColorReset, strings.Repeat(" ", padRight), borderColor, ColorReset)
 
 	// Ara Çizgi
-	fmt.Printf(" %s|%s|%s\n", ColorBlue, strings.Repeat("-", width), ColorReset)
+	TypePrint(" %s╠%s╣%s\n", borderColor, strings.Repeat("═", width), ColorReset)
 
 	// Satırlar
-	printReportRow("Toplam Hedef", stats.Total, ColorWhite, width)
-	printReportRow("Başarılı", stats.Success, ColorGreen, width)
-	printReportRow("Başarısız", stats.Failed, ColorRed, width)
-	printReportRow("Geçen Süre", stats.Duration.Round(time.Second), ColorYellow, width)
-	printReportRow("Klasör", stats.OutputDir, ColorPurple, width)
+	printReportRow("Toplam Hedef", stats.Total, ColorWhite, width, borderColor, labelColor)
+	printReportRow("Başarılı", stats.Success, ColorGreen, width, borderColor, labelColor)
+	printReportRow("Başarısız", stats.Failed, ColorRed, width, borderColor, labelColor)
+	printReportRow("Geçen Süre", stats.Duration.Round(time.Second), ColorYellow, width, borderColor, labelColor)
+	printReportRow("Klasör", stats.OutputDir, ColorPurple, width, borderColor, labelColor)
 
-	// Alt çizgi
-	fmt.Printf(" %s%s%s\n", ColorBlue, strings.Repeat("=", width+2), ColorReset)
+	// Alt Kenar
+	TypePrint(" %s╚%s╝%s\n", borderColor, strings.Repeat("═", width), ColorReset)
 	fmt.Println()
 }
 
 // AskForNewScan kullanıcıya yeni tarama yapmak isteyip istemediğini sorar
 func AskForNewScan() bool {
 	fmt.Println()
-	fmt.Printf(" %s[1] Yeni Tarama Başlat%s\n", ColorGreen, ColorReset)
-	fmt.Printf(" %s[0] Çıkış%s\n", ColorRed, ColorReset)
+	TypePrint(" %s[1] Yeni Tarama Başlat%s\n", ColorGreen, ColorReset)
+	TypePrint(" %s[0] Çıkış%s\n", ColorRed, ColorReset)
 	fmt.Println()
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -157,17 +288,26 @@ func AskForNewScan() bool {
 	}
 }
 
-func printReportRow(label string, value interface{}, color string, width int) {
+func printReportRow(label string, value interface{}, valColor string, width int, borderColor, labelColor string) {
 	valStr := fmt.Sprintf("%v", value)
 	valLen := utf8.RuneCountInString(valStr)
 
-	paddingLen := width - 24 - valLen
+	// Padding hesabı
+	// Content: " " (1) + Label (20) + " : " (3) + Value (valLen) + Padding
+	// Toplam uzunluk = width olmalı
+	usedWidth := 1 + 20 + 3 + valLen
+	paddingLen := width - usedWidth
+
 	if paddingLen < 0 {
 		paddingLen = 0
 	}
 
 	padding := strings.Repeat(" ", paddingLen)
-	fmt.Printf(" %s| %s%-20s : %s%s%s%s%s|%s\n", ColorBlue, ColorReset, label, color, valStr, ColorReset, padding, ColorBlue, ColorReset)
+
+	// Sol boşluk, Label (sola dayalı 20), :, Değer, Sağ boşluk
+	content := fmt.Sprintf(" %-20s : %s%s%s%s", label, valColor, valStr, ColorReset, padding)
+
+	TypePrint(" %s║%s%s%s║%s\n", borderColor, labelColor, content, borderColor, ColorReset)
 }
 
 // PrintCreatedFiles oluşturulan dosyaları listeler
@@ -176,9 +316,9 @@ func PrintCreatedFiles(files []FileInfo) {
 		return
 	}
 
-	fmt.Printf(" %s%s OLUŞTURULAN DOSYALAR:%s\n", ColorGreen, IconArrow, ColorReset)
+	TypePrint(" %s%s OLUŞTURULAN DOSYALAR:%s\n", ColorGreen, IconArrow, ColorReset)
 	for _, file := range files {
-		fmt.Printf("   %s %-30s %s(%s)%s\n", IconCheck, file.Name, ColorYellow, file.Size, ColorReset)
+		TypePrint("   %s %-30s %s(%s)%s\n", IconCheck, file.Name, ColorYellow, file.Size, ColorReset)
 	}
 	fmt.Println()
 }
@@ -186,23 +326,23 @@ func PrintCreatedFiles(files []FileInfo) {
 // PrintSectionHeader bölüm başlıklarını yazdırır
 func PrintSectionHeader(title string) {
 	fmt.Println()
-	fmt.Printf("%s%s %s %s%s\n", ColorBlue, IconArrow, title, IconArrow, ColorReset)
-	fmt.Println(strings.Repeat("-", 50))
+	TypePrint("%s%s %s %s%s\n", ColorBlue, IconArrow, title, IconArrow, ColorReset)
+	TypePrint("%s%s%s\n", ColorBlue, strings.Repeat("┄", 50), ColorReset)
 }
 
 // PrintSuccess başarılı işlem mesajını yeşil renkte yazdırır
 func PrintSuccess(msg string) {
-	fmt.Printf(" %s%s%s %s\n", ColorGreen, IconCheck, ColorReset, msg)
+	TypePrint(" %s%s%s %s\n", ColorGreen, IconCheck, ColorReset, msg)
 }
 
 // PrintInfo bilgi mesajını mavi renkte yazdırır
 func PrintInfo(msg string) {
-	fmt.Printf(" %s%s%s %s\n", ColorBlue, IconStar, ColorReset, msg)
+	TypePrint(" %s%s%s %s\n", ColorBlue, IconStar, ColorReset, msg)
 }
 
 // PrintError hata mesajını kırmızı renkte yazdırır
 func PrintError(msg string) {
-	fmt.Printf(" %s%s%s %s\n", ColorRed, IconCross, ColorReset, msg)
+	TypePrint(" %s%s%s %s\n", ColorRed, IconCross, ColorReset, msg)
 }
 
 // PrintWarningBox önemli uyarıları kutu içinde gösterir
@@ -217,14 +357,13 @@ func PrintWarningBox(lines []string) {
 	boxWidth := maxLength + 4
 
 	fmt.Println()
-	fmt.Printf("%s%s%s\n", ColorRed, strings.Repeat("=", boxWidth), ColorReset)
+	TypePrint(" %s╔%s╗%s\n", ColorRed, strings.Repeat("═", boxWidth), ColorReset)
 	for _, line := range lines {
-		// Padding hesaplarken görsel uzunluğu kullan
 		visualLength := utf8.RuneCountInString(line)
-		padding := strings.Repeat(" ", boxWidth-4-visualLength)
-		fmt.Printf("%s| %s%s |%s\n", ColorRed, line, padding, ColorReset)
+		padding := strings.Repeat(" ", boxWidth-visualLength)
+		TypePrint(" %s║ %s%s║%s\n", ColorRed, line, padding, ColorReset)
 	}
-	fmt.Printf("%s%s%s\n", ColorRed, strings.Repeat("=", boxWidth), ColorReset)
+	TypePrint(" %s╚%s╝%s\n", ColorRed, strings.Repeat("═", boxWidth), ColorReset)
 	fmt.Println()
 }
 
@@ -243,7 +382,7 @@ func PrintStatusLine(tag, item, status, detail string, isSuccess bool) {
 		tagDisplay = fmt.Sprintf("%s%-18s%s ", ColorCyan, tag, ColorReset)
 	}
 
-	fmt.Printf("   %s%s%-35s%s %s%s %s%s%s\n",
+	TypePrint("   %s%s%-35s%s %s%s %s%s%s\n",
 		tagDisplay,
 		ColorWhite, item, ColorReset,
 		color, icon, status,
@@ -257,7 +396,8 @@ func Spinner(action string, done chan bool) {
 	for {
 		select {
 		case <-done:
-			fmt.Printf("\r %s%s%s %s... %sTAMAMLANDI%s      \n", ColorGreen, IconCheck, ColorReset, action, ColorGreen, ColorReset)
+			ClearLine()
+			fmt.Printf(" %s%s%s %s... %sTAMAMLANDI%s\n", ColorGreen, IconCheck, ColorReset, action, ColorGreen, ColorReset)
 			return
 		default:
 			fmt.Printf("\r %s%c%s %s...", ColorCyan, chars[i%len(chars)], ColorReset, action)
@@ -308,17 +448,17 @@ func wrapText(text string, limit int) []string {
 // GetWorkerCount kullanıcıdan worker(köle) sayısını seçmesini ister
 func GetWorkerCount() int {
 	fmt.Println()
-	fmt.Printf(" %s%s WORKER/KÖLE (EŞZAMANLI İŞLEM) SAYISI:%s\n", ColorCyan, IconArrow, ColorReset)
-	fmt.Println(strings.Repeat("-", 40))
-	fmt.Printf("   %s[1]%s 3 Worker/Köle  (Düşük - Daha yavaş, daha stabil)\n", ColorGreen, ColorReset)
-	fmt.Printf("   %s[2]%s 5 Worker/Köle  (Orta - Dengeli)\n", ColorGreen, ColorReset)
-	fmt.Printf("   %s[3]%s 10 Worker/Köle (Yüksek - Daha hızlı, daha fazla kaynak)\n", ColorGreen, ColorReset)
-	fmt.Println(strings.Repeat("-", 40))
+	TypePrint(" %s%s WORKER/KÖLE (EŞZAMANLI İŞLEM) SAYISI:%s\n", ColorCyan, IconArrow, ColorReset)
+	TypePrint(" %s%s%s\n", ColorBlue, strings.Repeat("┄", 40), ColorReset)
+	TypePrint("   %s[1]%s 3 Worker/Köle  (Düşük - Daha yavaş, daha stabil)\n", ColorGreen, ColorReset)
+	TypePrint("   %s[2]%s 5 Worker/Köle  (Orta - Dengeli)\n", ColorGreen, ColorReset)
+	TypePrint("   %s[3]%s 10 Worker/Köle (Yüksek - Daha hızlı, daha fazla kaynak)\n", ColorGreen, ColorReset)
+	TypePrint(" %s%s%s\n", ColorBlue, strings.Repeat("┄", 40), ColorReset)
 	fmt.Println()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Printf(" %sNörüyoz >%s ", ColorCyan, ColorReset)
+		TypePrint(" %sNörüyoz >%s ", ColorCyan, ColorReset)
 		scanner.Scan()
 		input := strings.TrimSpace(scanner.Text())
 

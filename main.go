@@ -140,9 +140,10 @@ func main() {
 		}
 
 		// Yeni tur başlarsa
-		fmt.Println("\n" + strings.Repeat("-", 60) + "\n")
+		ui.ClearLine()
+		ui.TypePrintln("\n" + strings.Repeat("=", 60) + "\n")
 	}
-	ui.PrintTyped("İşlem Başarıyla Tamamlandı. Kendine cici bak!", 50*time.Millisecond)
+	ui.PrintTyped("İşlem Başarıyla Tamamlandı. Kendine cici bak!\n", 50*time.Millisecond, ui.ColorGreen)
 }
 
 func selectTargetFile() string {
@@ -164,7 +165,7 @@ func selectTargetFile() string {
 
 	// Manuel giriş
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf(" %sManuel Dosya Yolu Girin >%s ", ui.ColorCyan, ui.ColorReset)
+	ui.TypePrint(" %sManuel Dosya Yolu Girin >%s ", ui.ColorCyan, ui.ColorReset)
 	text, _ := reader.ReadString('\n')
 	return strings.TrimSpace(text)
 }
@@ -177,22 +178,22 @@ func selectUserAgentFile() string {
 	}
 
 	fmt.Println()
-	fmt.Printf(" %s%s USER-AGENT YAPILANDIRMASI:%s\n", ui.ColorCyan, ui.IconArrow, ui.ColorReset)
-	fmt.Println(strings.Repeat("-", 50))
+	ui.TypePrint(" %s%s USER-AGENT YAPILANDIRMASI:%s\n", ui.ColorCyan, ui.IconArrow, ui.ColorReset)
+	ui.TypePrintln(strings.Repeat("-", 50))
 
 	// Dosyaları listele
 	for i, f := range files {
-		fmt.Printf("   %s[%d]%s %s\n", ui.ColorGreen, i+1, ui.ColorReset, f)
+		ui.TypePrint("   %s[%d]%s %s\n", ui.ColorGreen, i+1, ui.ColorReset, f)
 	}
 
 	// Varsayılan seçenek
-	fmt.Printf("   %s[0]%s Varsayılan (Gömülü Liste)\n", ui.ColorYellow, ui.ColorReset)
-	fmt.Println(strings.Repeat("-", 50))
+	ui.TypePrint("   %s[0]%s Varsayılan (Gömülü Liste)\n", ui.ColorYellow, ui.ColorReset)
+	ui.TypePrintln(strings.Repeat("-", 50))
 	fmt.Println()
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Printf(" %sNörüyoz >%s ", ui.ColorCyan, ui.ColorReset)
+		ui.TypePrint(" %sNörüyoz >%s ", ui.ColorCyan, ui.ColorReset)
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSpace(text)
 
