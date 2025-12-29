@@ -13,15 +13,25 @@ func Analyze(htmlContent string, url string, linkCount int) Result {
 		return simpleAnalyze()
 	}
 
+	// İçerik ve Kod Ayrımı
+	visibleText := extractVisibleText(doc)
+
+	// Gelişmiş Meta Analizi
 	title := doc.Find("title").Text()
 	metaDesc, _ := doc.Find("meta[name='description']").Attr("content")
+	metaKw, _ := doc.Find("meta[name='keywords']").Attr("content")
+	ogTitle, _ := doc.Find("meta[property='og:title']").Attr("content")
+	ogDesc, _ := doc.Find("meta[property='og:description']").Attr("content")
+
+	// Meta verileri birleştir
+	combinedMeta := strings.Join([]string{title, metaDesc, metaKw, ogTitle, ogDesc}, " ")
 
 	bestScore := 0
 	var bestCategory *Category
 
 	for i := range GlobalConfig.Categories {
 		cat := &GlobalConfig.Categories[i]
-		score := calculateScore(cat, doc, htmlContent, title, metaDesc, linkCount)
+		score := calculateScore(cat, doc, htmlContent, visibleText, combinedMeta, linkCount)
 
 		if score > bestScore {
 			bestScore = score
@@ -36,7 +46,7 @@ func Analyze(htmlContent string, url string, linkCount int) Result {
 			if cat.ID == "login" {
 				continue
 			}
-			altScore := calculateScore(cat, doc, htmlContent, title, metaDesc, linkCount)
+			altScore := calculateScore(cat, doc, htmlContent, visibleText, combinedMeta, linkCount)
 			if altScore >= bestScore-10 {
 				bestScore = altScore
 				bestCategory = cat
@@ -123,11 +133,11 @@ func AnalyzeLinkContext(url, anchorText string) Result {
 }
 
 // calculateScore kategori skorunu hesaplar
-func calculateScore(cat *Category, doc *goquery.Document, rawHTML, title, metaDesc string, linkCount int) int {
+func calculateScore(cat *Category, doc *goquery.Document, rawHTML, visibleText, metaText string, linkCount int) int {
 	score := 0
 	lowerHTML := strings.ToLower(rawHTML)
-	lowerTitle := strings.ToLower(title)
-	lowerMeta := strings.ToLower(metaDesc)
+	lowerVisible := strings.ToLower(visibleText)
+	lowerMeta := strings.ToLower(metaText)
 
 	// Max link kontrolü (ceza)
 	if cat.MaxLinks > 0 && linkCount > cat.MaxLinks {
@@ -141,40 +151,72 @@ func calculateScore(cat *Category, doc *goquery.Document, rawHTML, title, metaDe
 		}
 	}
 
-	// High keyword
 	highHit := 0
 	for _, kw := range cat.Keywords.High {
 		k := strings.ToLower(kw)
-		if strings.Contains(lowerHTML, k) {
-			highHit++
-			if highHit <= 5 {
-				score += 10
-			}
+		matched := false
+
+		// Görünen metinde varsa +15
+		if strings.Contains(lowerVisible, k) {
+			score += 15
+			matched = true
 		}
-		if strings.Contains(lowerTitle, k) || strings.Contains(lowerMeta, k) {
-			score += 10
+		// Meta verilerde varsa +15
+		if strings.Contains(lowerMeta, k) {
+			score += 15
+			matched = true
+		}
+		// Sadece HTML içinde varsa ama yukarıdakilerde yoksa +5
+		if !matched && strings.Contains(lowerHTML, k) {
+			score += 5
+		}
+
+		if matched {
+			highHit++
+		}
+		if highHit > 5 {
 		}
 	}
 
 	// Medium keyword
 	medHit := 0
 	for _, kw := range cat.Keywords.Medium {
-		if strings.Contains(lowerHTML, strings.ToLower(kw)) {
+		k := strings.ToLower(kw)
+		if strings.Contains(lowerVisible, k) || strings.Contains(lowerMeta, k) {
 			medHit++
 			if medHit <= 7 {
 				score += 5
 			}
+		} else if strings.Contains(lowerHTML, k) {
+			// Sadece kod içinde varsa düşük puan
+			score += 2
 		}
 	}
 
 	// Exclude kelimeler
 	for _, kw := range cat.Keywords.Exclude {
-		if strings.Contains(lowerHTML, strings.ToLower(kw)) {
+		k := strings.ToLower(kw)
+		if strings.Contains(lowerVisible, k) || strings.Contains(lowerMeta, k) {
 			score -= 50
+		} else if strings.Contains(lowerHTML, k) {
+			score -= 20
 		}
 	}
 
 	return score
+}
+
+// extractVisibleText sadece sayfanın görünen metnini çeker
+func extractVisibleText(doc *goquery.Document) string {
+	// Bodynin bir kopyasını al
+	selection := doc.Find("body").Clone()
+
+	// İstenmeyen tagleri temizle
+	selection.Find("script, style, noscript, iframe, svg").Remove()
+
+	// Metni al ve boşlukları temizle
+	text := selection.Text()
+	return strings.Join(strings.Fields(text), " ")
 }
 
 // fallback
