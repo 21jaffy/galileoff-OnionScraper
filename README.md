@@ -90,11 +90,11 @@ darkmarketv2.onionhttp://forumxyz.onion
 ```
 
 > [!WARNING]
-> Dosyayı standart YAML formatında (örn: `- url: ...`) **YAZMAYINIZ**. Düz metin dosyayı gibi kullanınız. Program satır satır okuma yapar ve birleşik olan linkleri sizin için ayırıp tarama yapabilir.
+> Dosyayı standart YAML formatında (örn: `- url: ...`) **YAZMAYINIZ**. Düz metin dosyası gibi kullanınız. Program satır satır okuma yapar ve birleşik olan linkleri sizin için ayırıp tarama yapabilir.
 
 ## � Gelişmiş Yapılandırma
 
-OnionScraper, tarama davranışını özelleştirmeniz için iki temel dosyaya daha sahiptir.
+galileoff-OnionScraper, tarama davranışını özelleştirebileceğiniz iki temel dosyaya daha sahiptir.
 
 ### 1. Sınıflandırma Kuralları (`config/rules.yaml`)
 Programın siteleri nasıl etiketleyeceğini (örn: `[MARKET]`, `[FORUM]`) belirleyen kurallar bu dosyada tanımlanır. Kendi kurallarınızı ekleyebilirsiniz:
@@ -130,7 +130,7 @@ Gizliliği artırmak için kullanılan tarayıcı kimlikleri burada bulunur. Lis
 ]
 ```
 
-## �📂 Çıktı Yapısı
+## 📂 Çıktı Yapısı
 
 Sonuçlar, seçtiğiniz config dosyasının adıyla bir dosyada toplanır (Örn: `targets` klasörü). Her site için ayrı klasör açılmaz, tüm veriler URL tabanlı isimlendirilerek düzenli bir şekilde saklanır.
 
@@ -192,6 +192,16 @@ Bu proje açık kaynaklıdır ve topluluk desteğiyle geliştirilebilir. Eğer i
 3. Commit'leyin (`git commit -m 'Yeni özellik: X eklendi'`)
 4. Push'layın (`git push origin feature/yeniozellik`)
 5. Pull Request açın
+
+## 📈 Star History
+
+<a href="https://www.star-history.com/#galile0ff/galileoff-OnionScraper&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=galile0ff/galileoff-OnionScraper&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=galile0ff/galileoff-OnionScraper&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=galile0ff/galileoff-OnionScraper&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## 📄 Lisans
 

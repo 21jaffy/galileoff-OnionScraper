@@ -33,6 +33,5 @@ go.work.sum
 
 # Oluşturulan/Verilen dosyalar
 *.log
-*.png
 *.html
 *.txt
